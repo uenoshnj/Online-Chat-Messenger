@@ -10,7 +10,8 @@
 
 import socket
 import sys
-import threading
+import os
+
 
 # サーバのアドレス、ポート
 SERVER_ADDRESS = '0.0.0.0'
@@ -25,82 +26,159 @@ TIMEOUT = 30
 # メッセージ送信失敗最大回数
 MAXSENDCOUNT = 3
 
+# 接続削除用
+CLOSECONNECTION = 'exit'
+
+class Udp_Client:
+    def __init__(self):
+        self.username = self.readInput(255, 'name')
+        self.port = int(self.readInput(5, 'port'))
+
+    # ユーザの入力を読み込み
+    def readInput(self, length, question):
+        maxLength = length + 1
+        while maxLength > length:
+            userInput = input(f'{question}: ')
+            maxLength = len(userInput)
+            if maxLength > length - 1:
+                print(f'{question} up to {length}')
+        return userInput
+    
+    def getUserName(self):
+        return self.username
+    
+    def getPort(self):
+        return self.port
+
+
 # ヘッダー情報のフォーマット
 def protocolHeader(usernameLen, dataLen):
     return usernameLen.to_bytes(1) + dataLen.to_bytes(4)
 
-# ユーザの入力を読み込み
-def readInput(length, question):
-    maxLength = length + 1
-    while maxLength > length:
-        userInput = input(f'Enter the {question}: ')
-        maxLength = len(userInput)
-        if maxLength > length - 1:
-            print(f'{question} must be {length} characters or less')
-    return userInput
-
-
 # UDPソケットの作成
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
 print(f'Connected {SERVER_ADDRESS}:{SERVER_PORT}')
 
-# データ受信
-def receiveMsg(sock):
+# ユーザ情報作成
+client = Udp_Client()
+
+userNameBits = client.getUserName().encode()
+
+# 接続の紐づけ
+sock.bind((ADDRESS, client.getPort()))
+
+print('\nChat start!\n'\
+    "if you want to leave, Enter 'exit'\n")
+
+# タイムアウトの設定
+sock.settimeout(30)
+
+# 子プロセスの作成
+pid = os.fork()
+
+# 子プロセスの場合、メッセージ送信
+if pid == 0:
     try:
         while True:
-            data, server = sock.recvfrom(4096)
-            print(data.decode())
-    except:
-        pass
+            # メッセージの入力
+            userMessage = input()
+            userMessageBits = userMessage.encode()
 
+            # ヘッダの作成
+            header = protocolHeader(len(userNameBits), len(userMessageBits))
 
+            # ヘッダの送信
+            sock.sendto(header, (SERVER_ADDRESS, SERVER_PORT))
 
-try:
-    # ユーザ名の入力
-    userName = readInput(255, 'name')
-    userNameBits = userName.encode()
+            # ユーザ名の送信
+            sock.sendto(userNameBits, (SERVER_ADDRESS, SERVER_PORT))
 
-    # クライアントポートの入力
-    port = int(readInput(5, 'port'))
+            if userMessage == CLOSECONNECTION:
+                sock.sendto(CLOSECONNECTION.encode(), (SERVER_ADDRESS, SERVER_PORT))
+                break
+            # メッセージの送信
+            else:
+                sock.sendto(userMessageBits, (SERVER_ADDRESS, SERVER_PORT))
+            
 
-    # 接続の紐づけ
-    sock.bind((ADDRESS, port))
-
-    # データ受信開始
-    recvThread = receiveMsg(sock)
-
-    recvThread.start()
-
-
-
-    while True:
-        # メッセージの入力
-        userMessage = readInput(4096, 'message')
-        userMessageBits = userMessage.encode()
-
+    except TimeoutError as e:
         # ヘッダの作成
         header = protocolHeader(len(userNameBits), len(userMessageBits))
 
         # ヘッダの送信
-        if sock.sendto(header, (SERVER_ADDRESS, SERVER_PORT)):
-            sendflg = True
+        sock.sendto(header, (SERVER_ADDRESS, SERVER_PORT))
 
         # ユーザ名の送信
-        if sock.sendto(userNameBits, (SERVER_ADDRESS, SERVER_PORT)):
-            sendflg = True
+        sock.sendto(userNameBits, (SERVER_ADDRESS, SERVER_PORT))
+        sock.sendto(CLOSECONNECTION.encode(), (SERVER_ADDRESS, SERVER_PORT))
+        print(f'error: {e}')
 
-        # メッセージの送信
-        if sock.sendto(userMessageBits, (SERVER_ADDRESS, SERVER_PORT)):
-            sendflg = True
+    except OSError as e:
+        # ヘッダの作成
+        header = protocolHeader(len(userNameBits), len(userMessageBits))
 
-        # メッセージの受信
-        data, server = sock.recvfrom(4096)
-        print(data.decode())
+        # ヘッダの送信
+        sock.sendto(header, (SERVER_ADDRESS, SERVER_PORT))
+
+        # ユーザ名の送信
+        sock.sendto(userNameBits, (SERVER_ADDRESS, SERVER_PORT))
+
+        sock.sendto(CLOSECONNECTION.encode(), (SERVER_ADDRESS, SERVER_PORT))
+        print(f'error: {e}')
+    
+    except Exception as e:
+        # ヘッダの作成
+        header = protocolHeader(len(userNameBits), len(userMessageBits))
+
+        # ヘッダの送信
+        sock.sendto(header, (SERVER_ADDRESS, SERVER_PORT))
+
+        # ユーザ名の送信
+        sock.sendto(userNameBits, (SERVER_ADDRESS, SERVER_PORT))
         
-        if userMessage == 'end':
-            break
+        sock.sendto(CLOSECONNECTION.encode(), (SERVER_ADDRESS, SERVER_PORT))
+        print(f'error: {e}')
 
-finally:
-    print('Closing connection')
-    sock.close()
+    finally:
+        print('Disconnect')
+        sock.close()
+        sys.exit(1)
+
+# 親プロセスの場合、メッセージ受信
+else:
+    try:
+        while True:
+            # メッセージの受信
+            data, server = sock.recvfrom(4096)
+            print(data.decode())
+
+    except OSError as e:
+        # ヘッダの作成
+        header = protocolHeader(len(userNameBits), len(CLOSECONNECTION))
+
+        # ヘッダの送信
+        sock.sendto(header, (SERVER_ADDRESS, SERVER_PORT))
+
+        # ユーザ名の送信
+        sock.sendto(userNameBits, (SERVER_ADDRESS, SERVER_PORT))
+        
+        sock.sendto(CLOSECONNECTION.encode(), (SERVER_ADDRESS, SERVER_PORT))
+        print(f'error: {e}')
+    
+    except Exception as e:
+        # ヘッダの作成
+        header = protocolHeader(len(userNameBits), len(CLOSECONNECTION))
+
+        # ヘッダの送信
+        sock.sendto(header, (SERVER_ADDRESS, SERVER_PORT))
+
+        # ユーザ名の送信
+        sock.sendto(userNameBits, (SERVER_ADDRESS, SERVER_PORT))
+        
+        sock.sendto(CLOSECONNECTION.encode(), (SERVER_ADDRESS, SERVER_PORT))
+        print(f'error: {e}')
+    
+    finally:
+        print('Disconnect')
+        sock.close()
+        sys.exit(1)

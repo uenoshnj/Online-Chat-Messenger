@@ -10,7 +10,6 @@
 
 import os
 import socket
-import threading
 import sys
 
 DPATH = 'temp'
@@ -22,7 +21,7 @@ SERVER_PORT = 9001
 if not os.path.exists(DPATH):
     os.makedirs(DPATH)
 
-# 接続中のユーザ辞書
+# 接続中のユーザ
 user_dict = {}
 
 # UDPソケット作成
@@ -33,46 +32,49 @@ print(f'starting up on port {SERVER_PORT}')
 # アドレス紐づけ
 sock.bind((SERVER_ADDRESS, SERVER_PORT))
 
-while True:
-    # ヘッダを受信し、ユーザ名の長さとデータの長さを変数に格納
-    header = sock.recv(5)
-    print(header)
-    usernamelen = int.from_bytes(header[:1])
-    data_length = int.from_bytes(header[1:])
+try:
+    while True:
+        # ヘッダを受信し、ユーザ名の長さとデータの長さを変数に格納
+        header = sock.recv(5)
+        usernamelen = int.from_bytes(header[:1])
+        data_length = int.from_bytes(header[1:])
 
-    # ユーザ名取得
-    username = sock.recv(usernamelen).decode()
-    print(username)
+        # ユーザ名取得
+        username = sock.recv(usernamelen).decode()
 
-    # データ(メッセージ)を受信
-    data, address = sock.recvfrom(data_length)
-    print(f'Received {len(data)} bytes from {address}')
-    message = data.decode()
+        # データ(メッセージ)を受信
+        data, address = sock.recvfrom(data_length)
+        message = data.decode()
 
-    # ユーザとの接続削除
-    if message == 'end':
-        print(f'{username} logged out')
-        user_dict.pop(username)
+        # ユーザ名が既に存在している場合、メッセージを返却。
+        if username in user_dict.keys() and address[1] not in user_dict.values():
+            sock.sendto(b'user is already exist!', address)
+            continue
 
-    # key：ユーザ名, value：アドレスで辞書に格納
-    if username not in user_dict.keys():
-        user_dict[username] = address
+        # クライアントからexitを受け取った場合、ユーザ削除
+        if message == 'exit':
+            user_dict.pop(username)
+        # それ以外の場合
+        else:
+            # key：ユーザ名, value：アドレスで辞書に格納
+            if username not in user_dict.keys():
+                user_dict[username] = address
 
-    # ユーザ名：メッセージの形式で標準出力
-    user_message = f'{username}: {message}'
-    print(user_message)
+            # ユーザ名：メッセージの形式でファイルに保存
+            user_message = f'{username}: {message}'
+            with open(os.path.join(DPATH, MESSAGELOG), 'a') as f:
+                f.write(user_message + '\n')
+
+            # 接続中のすべてのクライアントにメッセージを送信
+        for value in user_dict.values():
+            sock.sendto(user_message.encode(), value)
 
 
-    # ユーザ名：メッセージの形式でファイルに保存
-    with open(os.path.join(DPATH, MESSAGELOG), 'a') as f:
-        f.write(user_message + '\n')
-        print('logged the message')
+except OSError as e:
+    print(f'OSerror: {e}')
 
-    # 接続中のすべてのクライアントにメッセージを送信
-    print('now online: ')
-    for key in user_dict.keys():
-        print(key)
+except Exception as e:
+    print(f'Exception: {e}')
 
-    for value in user_dict.values():
-        print(value)
-        sock.sendto(user_message.encode(), value)
+finally:
+    sock.close()
