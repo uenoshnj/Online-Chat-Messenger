@@ -23,17 +23,17 @@ class Udp_Client:
         self.username: str = ''
         self.buffer: int = 4095
 
-        self.faultCount = 0
+        self.faultCount: int = 0
 
     # ソケット紐づけ
     def setBind(self) -> None:
         self.sock.bind((self.clientHost, self.clientPort))
 
     # データ送信
-    def send(self) -> None:
+    def send(self, usernamelen) -> None:
         while True:
             message: str = input()
-            data: bytes = f'{self.username} : {message}'.encode('utf-8')
+            data: bytes = f'{usernamelen}{self.username}:{message}'.encode('utf-8')
             self.sock.sendto(data, (self.serverHost, self.serverPort))
 
             if message == 'exit':
@@ -59,10 +59,13 @@ class Udp_Client:
         l: int = len(input)
         return 0 < l and l <= len
 
-    # ユーザ名入力
+    # ユーザ名入力、エンコード
     def inputUsername(self) -> None:
         while not self.isValidLength(self.username, 10):
             self.username = input('User name(Up to 10 characters): ')
+        
+        return self.username.encode('utf-8')
+
 
     # ユーザの入力をバイトへ変換
     def inputToBytes(input: int, len: int) -> bytes:
@@ -77,10 +80,24 @@ class Udp_Client:
         # ソケットとの紐づけ
         self.setBind()
 
-        # ユーザ名入力の呼び出し
-        self.inputUsername()
+        # ユーザ名入力の呼び出し、エンコード
+        usernameBits = self.inputUsername()
 
-        
+        usernamelen = self.inputToBytes(len(usernameBits), 1)
+
+        # スレッドの作成、実行
+        sendThread: threading.Thread = threading.Thread(target=self.send, args=usernamelen)
+        receiveThread: threading.Thread = threading.Thread(target=self.receive, args=usernamelen)
+
+        sendThread.start()
+        receiveThread.start()
+
+        sendThread.join()
+        receiveThread.join()
+
+        print('close connection')
+        self.sock.close()
+
 
 
 # # サーバのアドレス、ポート
