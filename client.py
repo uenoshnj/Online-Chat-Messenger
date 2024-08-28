@@ -21,7 +21,8 @@ class Udp_Client:
         self.clientPort: int = 9050
 
         self.username: str = ''
-        self.buffer: int = 4095
+        self.usernamelen: int = 0
+        self.buffer: int = 4096
 
         self.faultCount: int = 0
 
@@ -30,10 +31,10 @@ class Udp_Client:
         self.sock.bind((self.clientHost, self.clientPort))
 
     # データ送信
-    def send(self, usernamelen) -> None:
+    def send(self) -> None:
         while True:
             message: str = input()
-            data: bytes = f'{usernamelen}{self.username}:{message}'.encode('utf-8')
+            data: bytes = self.usernamelen.to_bytes(1, 'big') + f'{self.username}{message}'.encode('utf-8')
             self.sock.sendto(data, (self.serverHost, self.serverPort))
 
             if message == 'exit':
@@ -44,7 +45,7 @@ class Udp_Client:
     # データ受信
     def receive(self) -> None:
         while True:
-            data: bytes = self.sock.recv(4096)
+            data: bytes = self.sock.recv(self.buffer)
             message = data.decode('utf-8')
 
             if message[message.find(':') + 1:] == 'exit':
@@ -66,13 +67,6 @@ class Udp_Client:
         
         return self.username.encode('utf-8')
 
-
-    # ユーザの入力をバイトへ変換
-    def inputToBytes(input: int, len: int) -> bytes:
-        return input.to_bytes(len, 'big')
-
-
-
     # 接続
     def communicate(self) -> None:
         print(f'Connected {self.serverAddress}')
@@ -83,11 +77,11 @@ class Udp_Client:
         # ユーザ名入力の呼び出し、エンコード
         usernameBits = self.inputUsername()
 
-        usernamelen = self.inputToBytes(len(usernameBits), 1)
+        self.usernamelen = len(usernameBits)
 
         # スレッドの作成、実行
-        sendThread: threading.Thread = threading.Thread(target=self.send, args=usernamelen)
-        receiveThread: threading.Thread = threading.Thread(target=self.receive, args=usernamelen)
+        sendThread: threading.Thread = threading.Thread(target=self.send)
+        receiveThread: threading.Thread = threading.Thread(target=self.receive)
 
         sendThread.start()
         receiveThread.start()
@@ -98,6 +92,10 @@ class Udp_Client:
         print('close connection')
         self.sock.close()
 
+def main():
+    udp_client_chat: Udp_Client = Udp_Client()
+    udp_client_chat.setBind()
+    udp_client_chat.communicate()
 
 
 # # サーバのアドレス、ポート

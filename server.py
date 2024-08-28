@@ -31,28 +31,41 @@ class Udp_Server:
         for address in self.user_dict.values() :
             self.sock.sendto(sendData, address)
 
-
     # データ受信
     def receive(self) -> bytes:
+        # 型ヒント
         recvdata: bytes
         address: tuple[str, int]
-        username: str
-        msg: str
 
+        # データ受信
         recvdata, address = self.sock.recvfrom(4096)
-        recvdata_str: str = recvdata.decode('utf-8')
-        username, msg = recvdata_str.split(':')
+
+        # バイトから文字列に変換
+        usernamelen: int = int.from_bytes(recvdata[:1], 'big')
+        username: str = recvdata[1:usernamelen].decode('utf-8')
+        msg: str = recvdata[1 + usernamelen:].decode('utf-8')
         time_start: float = time.perf_counter()
-        self.user_dict[username[1:]] = [address, time_start]
-    
+        self.user_dict[username] = [address, time_start]
+        
+
         return recvdata
-    
+
     # リレーシステムからユーザを削除
     def deleteTimeOverUser(self, username: str) -> None:
         for user in self.user_dict.keys():
             if time.perf_counter() - self.user_dict[user][1] >= 60:
                 del self.user_dict[user]
     
+    def communication(self) -> None:
+        self.setBind()
+        receiveData: bytes = self.receive()
+
+        self.deleteTimeOverUser()
+
+    
+
+def main():
+
 
 
 
