@@ -13,6 +13,41 @@ import os
 import threading
 import time
 
+class Tcp_Client:
+    def __init__(self) -> None:
+        self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.serverHost: str = '0.0.0.0'
+        self.serverPort: int = 9001
+        self.clientHost: str = ''
+        self.clientPort: int = 0
+
+    # 接続
+    def connect(self) -> None:
+        try:
+            self.sock.connect((self.serverHost, self.serverPort))
+        
+        except OSError as err:
+            print(f'error : {err}')
+            sys.exit(1)
+    
+    # チャットルーム作成
+    def createRoom(self) -> None:
+        return 0
+    
+    # チャットルーム参加
+    def joinRoom(self) -> None:
+        return 0
+    
+    # ヘッダープロトコル作成
+    def createHeaderProtocol(self, roomNameLength: int, operation: int, state: int, payloadSize: int) -> bytes:
+        roomNameLengthBits = roomNameLength.to_bytes(1, 'big')
+        operationBits = operation.to_bytes(1, 'big')
+        stateBits = state.to_bytes(1, 'big')
+        payloadSizeBits = payloadSize.to_bytes(29, 'big')
+        return roomNameLengthBits + operationBits + stateBits + payloadSizeBits
+
+
+
 class Udp_Client:
     def __init__(self) -> None:
         self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
