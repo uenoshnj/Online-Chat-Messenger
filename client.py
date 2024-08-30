@@ -21,6 +21,10 @@ class Tcp_Client:
         self.clientHost: str = ''
         self.clientPort: int = 0
 
+        self.roomName = ''
+        self.userName = ''
+
+
     # 接続
     def connect(self) -> None:
         try:
@@ -40,12 +44,30 @@ class Tcp_Client:
     
     # ヘッダープロトコル作成
     def createHeaderProtocol(self, roomNameLength: int, operation: int, state: int, payloadSize: int) -> bytes:
-        roomNameLengthBits = roomNameLength.to_bytes(1, 'big')
-        operationBits = operation.to_bytes(1, 'big')
-        stateBits = state.to_bytes(1, 'big')
-        payloadSizeBits = payloadSize.to_bytes(29, 'big')
-        return roomNameLengthBits + operationBits + stateBits + payloadSizeBits
+        return \
+            roomNameLength.to_bytes(1, 'big') + \
+            operation.to_bytes(1, 'big') + \
+            state.to_bytes(1, 'big') +\
+            payloadSize.to_bytes(29, 'big')
+    
+    # 長さチェック
+    def isValidLength(self, input: str, length: int) -> bool:
+        l: int = len(input)
+        return 0 < l and l <= length
 
+    # ルーム名の入力
+    def inputRoomName(self) -> bytes:
+        while not self.isValidLength(self.roomName, 20):
+            self.roomName = input('room name(Up to 20 characters) : ')
+        
+        return self.roomName.encode('utf-8')
+
+    # ユーザ名の入力
+    def inputUsername(self) -> bytes:
+        while not self.isValidLength(self.userName, 10):
+            self.userName = input('user name(Up to 10 characters) : ')
+        
+        return self.userName.encode('utf-8')
 
 
 class Udp_Client:
