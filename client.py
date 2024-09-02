@@ -21,8 +21,10 @@ class Tcp_Client:
         self.clientHost: str = ''
         self.clientPort: int = 0
 
-        self.roomName = ''
-        self.userName = ''
+        self.roomName: str = ''
+        self.userName: str = ''
+        self.operation: int = 0
+        self.state: int = 0
 
 
     # 接続
@@ -43,11 +45,11 @@ class Tcp_Client:
         return 0
     
     # ヘッダープロトコル作成
-    def createHeaderProtocol(self, roomNameLength: int, operation: int, state: int, payloadSize: int) -> bytes:
+    def createHeaderProtocol(self, roomNameLength: int, operationLength: int, stateLength: int, payloadSize: int) -> bytes:
         return \
             roomNameLength.to_bytes(1, 'big') + \
-            operation.to_bytes(1, 'big') + \
-            state.to_bytes(1, 'big') +\
+            operationLength.to_bytes(1, 'big') + \
+            stateLength.to_bytes(1, 'big') +\
             payloadSize.to_bytes(29, 'big')
     
     # 長さチェック
@@ -68,6 +70,68 @@ class Tcp_Client:
             self.userName = input('user name(Up to 10 characters) : ')
         
         return self.userName.encode('utf-8')
+    
+    # 操作の入力
+    def inputOperation(self) -> bytes:
+        while self.operation != 1 or self.operation != 2:
+            self.operation = int(input('input operation(1 or 2) : '))
+        
+        return self.operation.to_bytes(1, 'big')
+    
+
+    # サーバ初期化依頼
+    def serverInit(self, tcrp: bytes) -> None:
+        try:
+            self.sock.sendto(tcrp, (self.serverHost, self.serverPort))
+        
+        except OSError as e:
+            print(f'error: {e}')
+        
+        finally:
+            self.sock.close()
+            sys.exit(1)
+    
+    def receive(self) -> None:
+        self.sock.recv()
+
+    #
+    def communication(self) -> None:
+        # サーバへ接続
+        self.connect()
+
+        # ルーム名、ユーザ名、操作の入力
+        roomNameBits = self.inputRoomName()
+        roomNameBitsLen = len(roomNameBits)
+
+        usernameBits = self.inputUsername()
+        usernameBitsLen = len(usernameBits)
+
+        operationBits = self.inputOperation()
+        operationBitsLen = len(operationBits)
+
+        stateBits = self.state.to_bytes(1, 'big')
+        stateBitsLen = len(stateBits)
+        
+        header = self.createHeaderProtocol(roomNameBitsLen, operationBitsLen, stateBitsLen, usernameBitsLen)
+
+        body = roomNameBits + usernameBits
+
+        tcpr = header + body
+
+        self.serverInit(tcpr)
+
+        # 準拠
+        data: bytes = self.sock.recv(4096)
+
+        # 完了
+        data: bytes = self.sock.recv(4096)
+
+
+
+
+
+
+
 
 
 class Udp_Client:
