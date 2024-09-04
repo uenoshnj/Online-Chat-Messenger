@@ -91,6 +91,7 @@ class Tcp_Client:
             self.sock.close()
             sys.exit(1)
     
+    # データ受信
     def receive(self) -> None:
         self.sock.recv()
 
@@ -100,23 +101,28 @@ class Tcp_Client:
         self.connect()
 
         # ルーム名、ユーザ名、操作の入力
-        roomNameBits = self.inputRoomName()
-        roomNameBitsLen = len(roomNameBits)
+        roomNameBits: bytes = self.inputRoomName()
+        roomNameBitsLen: int = len(roomNameBits)
 
-        usernameBits = self.inputUsername()
-        usernameBitsLen = len(usernameBits)
+        usernameBits: bytes = self.inputUsername()
+        usernameBitsLen: int = len(usernameBits)
 
-        operationBits = self.inputOperation()
-        operationBitsLen = len(operationBits)
+        operationBits: bytes = self.inputOperation()
+        operationBitsLen: int = len(operationBits)
 
-        stateBits = self.state.to_bytes(1, 'big')
-        stateBitsLen = len(stateBits)
+        if self.operation == 1:
+            # パスワードの入力
+            passward = input('password : ')
+
+
+        stateBits: bytes = self.state.to_bytes(1, 'big')
+        stateBitsLen: int = len(stateBits)
         
-        header = self.createHeaderProtocol(roomNameBitsLen, operationBitsLen, stateBitsLen, usernameBitsLen)
+        header: bytes = self.createHeaderProtocol(roomNameBitsLen, operationBitsLen, stateBitsLen, usernameBitsLen)
 
-        body = roomNameBits + usernameBits
+        body: bytes = roomNameBits + usernameBits
 
-        tcpr = header + body
+        tcpr: bytes = header + body
 
         self.serverInit(tcpr)
 
@@ -125,6 +131,8 @@ class Tcp_Client:
 
         # 完了
         data: bytes = self.sock.recv(4096)
+
+        return token
 
 
 
@@ -238,6 +246,8 @@ class Udp_Client:
         self.sock.close()
 
 def main():
+    tcp_client_chat: Tcp_Client = Tcp_Client()
+    
     udp_client_chat: Udp_Client = Udp_Client()
     udp_client_chat.communicate()
 

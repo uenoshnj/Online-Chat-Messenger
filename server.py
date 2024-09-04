@@ -13,6 +13,69 @@ import socket
 import sys
 import time
 import threading
+import secrets
+
+class ChatRoom:
+    def __init__(self, name) -> None:
+        self.name: str = ''
+        # self.password: str = ''
+        self.tokenList: list[str] = []
+
+user_dict: dict[str, list] = {}
+
+class Tcp_Server:
+    def __init__(self) -> None:
+        self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.serverHost: str = '0.0.0.0'
+        self.serverPort: int = 9001
+
+    # 接続受け付け
+    def listen(self) -> None:
+        self.sock.bind((self.serverHost, self.serverPort))
+        self.sock.listen(1)
+
+
+    # データ送信
+    def send(self, data: bytes, host: str, port: int) -> None:
+        return 0
+
+    # トークン作成
+    def createToken(self) -> int:
+        return secrets.token_hex(16)
+
+
+    def communication(self) -> None:
+        self.listen()
+
+        while True:
+            # 型ヒント
+            connection: socket.socket
+            address: tuple[str, int]
+
+            connection, address = self.sock.accept()
+
+            data: bytes = connection.recv(4096)
+
+            header:bytes = data[:32]
+            body:bytes = data[32:]
+            roomNameSize: int = int.from_bytes(header[0], 'big')
+            operation: int = int.from_bytes(header[1], 'big')
+            state: int = int.from_bytes(header[2], 'big')
+            roomName: str = body[:roomNameSize].decode('utf-8')
+            username: str = body[roomNameSize:].decode('utf-8')
+
+            if operation == 1:
+                state = 1
+                state_bytes = state.to_bytes(1, 'big')
+                connection.send(header[0] + header[1] + state_bytes + header[3:] + body)
+                
+
+
+
+
+
+
+
 
 class Udp_Server:
     def __init__(self) -> None:
