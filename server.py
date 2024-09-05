@@ -17,6 +17,7 @@ import secrets
 
 class ChatRoom:
     def __init__(self, name) -> None:
+        
         self.name: str = ''
         # self.password: str = ''
         self.tokenList: list[str] = []
@@ -25,12 +26,14 @@ user_dict: dict[str, list] = {}
 
 class Tcp_Server:
     def __init__(self) -> None:
+        
         self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serverHost: str = '0.0.0.0'
         self.serverPort: int = 9001
 
     # 接続受け付け
     def listen(self) -> None:
+        
         self.sock.bind((self.serverHost, self.serverPort))
         self.sock.listen(1)
 
@@ -45,6 +48,7 @@ class Tcp_Server:
 
 
     def communication(self) -> None:
+        
         self.listen()
 
         while True:
@@ -65,10 +69,15 @@ class Tcp_Server:
             username: str = body[roomNameSize:].decode('utf-8')
 
             if operation == 1:
-                state = 1
-                state_bytes = state.to_bytes(1, 'big')
+                state: int = 1
+                state_bytes: bytes = state.to_bytes(1, 'big')
                 connection.send(header[0] + header[1] + state_bytes + header[3:] + body)
                 
+                # トークン作成
+                token: int = self.createToken()
+
+                connection.send()
+
 
 
 
