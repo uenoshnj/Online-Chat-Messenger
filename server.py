@@ -14,13 +14,22 @@ import sys
 import time
 import threading
 import secrets
+import random
 
 class ChatRoom:
     def __init__(self, name) -> None:
-        
         self.name: str = ''
         # self.password: str = ''
-        self.tokenList: list[str] = []
+        self.user_list: list[User] = []
+        self.hostUser: str = ''
+        self.token: str = ''
+
+
+
+class User:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
 
 user_dict: dict[str, list] = {}
 
@@ -30,10 +39,11 @@ class Tcp_Server:
         self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serverHost: str = '0.0.0.0'
         self.serverPort: int = 9001
+        self.header_buff: int = 32
+        self.payload_buff: int = 37
 
     # 接続受け付け
     def listen(self) -> None:
-        
         self.sock.bind((self.serverHost, self.serverPort))
         self.sock.listen(1)
 
@@ -43,8 +53,9 @@ class Tcp_Server:
         return 0
 
     # トークン作成
-    def createToken(self) -> int:
-        return secrets.token_hex(16)
+    def createToken(self) -> str:
+        digit = random.randrange(10, 128)
+        return secrets.token_hex(digit)
 
 
     def communication(self) -> None:
@@ -58,10 +69,10 @@ class Tcp_Server:
 
             connection, address = self.sock.accept()
 
-            data: bytes = connection.recv(4096)
+            data: bytes = connection.recv(self.header_buff + self.payload_buff)
 
-            header:bytes = data[:32]
-            body:bytes = data[32:]
+            header: bytes = data[:self.header_buff]
+            body: bytes = data[self.header_buff:]
             roomNameSize: int = int.from_bytes(header[0], 'big')
             operation: int = int.from_bytes(header[1], 'big')
             state: int = int.from_bytes(header[2], 'big')
@@ -73,8 +84,16 @@ class Tcp_Server:
                 state_bytes: bytes = state.to_bytes(1, 'big')
                 connection.send(header[0] + header[1] + state_bytes + header[3:] + body)
                 
+                chatRoom: ChatRoom = ChatRoom(roomName)
+                chatRoom.hostUser = username
+
                 # トークン作成
-                token: int = self.createToken()
+                token: str = self.createToken()
+
+                user: User = User(username)
+                chatRoom.token = token
+                chatRoom.user_list.append(user)
+
 
                 connection.send()
 
