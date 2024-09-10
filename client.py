@@ -13,7 +13,7 @@ import os
 import threading
 import time
 
-class Tcp_Client:
+class TcpClient:
     def __init__(self) -> None:
         self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serverHost: str = '0.0.0.0'
@@ -37,15 +37,15 @@ class Tcp_Client:
             sys.exit(1)
     
     # チャットルーム作成
-    def createRoom(self) -> None:
+    def create_room(self) -> None:
         return 0
     
     # チャットルーム参加
-    def joinRoom(self) -> None:
+    def join_room(self) -> None:
         return 0
     
     # ヘッダープロトコル作成
-    def createHeaderProtocol(self, roomNameLength: int, operationLength: int, stateLength: int, payloadSize: int) -> bytes:
+    def create_header_protocol(self, roomNameLength: int, operationLength: int, stateLength: int, payloadSize: int) -> bytes:
         return \
             roomNameLength.to_bytes(1, 'big') + \
             operationLength.to_bytes(1, 'big') + \
@@ -53,34 +53,34 @@ class Tcp_Client:
             payloadSize.to_bytes(29, 'big')
     
     # 長さチェック
-    def isValidLength(self, input: str, length: int) -> bool:
+    def is_valid_length(self, input: str, length: int) -> bool:
         l: int = len(input)
         return 0 < l and l <= length
 
     # ルーム名の入力
-    def inputRoomName(self) -> bytes:
-        while not self.isValidLength(self.roomName, 20):
+    def input_room_name(self) -> bytes:
+        while not self.is_valid_length(self.roomName, 20):
             self.roomName = input('room name(Up to 20 characters) : ')
         
         return self.roomName.encode('utf-8')
 
     # ユーザ名の入力
-    def inputUsername(self) -> bytes:
-        while not self.isValidLength(self.userName, 10):
+    def input_username(self) -> bytes:
+        while not self.is_valid_length(self.userName, 10):
             self.userName = input('user name(Up to 10 characters) : ')
         
         return self.userName.encode('utf-8')
     
     # 操作の入力
-    def inputOperation(self) -> bytes:
+    def input_operation(self) -> bytes:
         while self.operation != 1 or self.operation != 2:
             self.operation = int(input('input operation(1 or 2) : '))
         
         return self.operation.to_bytes(1, 'big')
-    
+
 
     # サーバ初期化依頼
-    def serverInit(self, tcrp: bytes) -> None:
+    def server_nit(self, tcrp: bytes) -> None:
         try:
             self.sock.sendto(tcrp, (self.serverHost, self.serverPort))
         
@@ -101,13 +101,13 @@ class Tcp_Client:
         self.connect()
 
         # ルーム名、ユーザ名、操作の入力
-        roomNameBits: bytes = self.inputRoomName()
+        roomNameBits: bytes = self.input_room_name()
         roomNameBitsLen: int = len(roomNameBits)
 
-        usernameBits: bytes = self.inputUsername()
+        usernameBits: bytes = self.input_username()
         usernameBitsLen: int = len(usernameBits)
 
-        operationBits: bytes = self.inputOperation()
+        operationBits: bytes = self.input_operation()
         operationBitsLen: int = len(operationBits)
 
         if self.operation == 1:
@@ -118,13 +118,13 @@ class Tcp_Client:
         stateBits: bytes = self.state.to_bytes(1, 'big')
         stateBitsLen: int = len(stateBits)
         
-        header: bytes = self.createHeaderProtocol(roomNameBitsLen, operationBitsLen, stateBitsLen, usernameBitsLen)
+        header: bytes = self.create_header_protocol(roomNameBitsLen, operationBitsLen, stateBitsLen, usernameBitsLen)
 
         body: bytes = roomNameBits + usernameBits
 
         tcpr: bytes = header + body
 
-        self.serverInit(tcpr)
+        self.server_nit(tcpr)
 
         # 準拠
         data: bytes = self.sock.recv(4096)
@@ -142,7 +142,7 @@ class Tcp_Client:
 
 
 
-class Udp_Client:
+class UdpClient:
     def __init__(self) -> None:
         self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.serverHost: str = '0.0.0.0'
@@ -158,7 +158,7 @@ class Udp_Client:
         self.faultCount: int = 0
 
     # ソケット紐づけ
-    def setBind(self) -> None:
+    def set_bind(self) -> None:
         self.sock.bind((self.clientHost, self.clientPort))
         self.lastSendTime = time.perf_counter()
 
@@ -166,7 +166,7 @@ class Udp_Client:
     def send(self) -> None:
         while True:    
             message: str = input()
-            if self.checkTimeout():
+            if self.check_timeout():
                 message = 'exit'
                 print('Time out!')
             data: bytes = self.usernamelen.to_bytes(1, 'big') + f'{self.username}{message}'.encode('utf-8')
@@ -196,25 +196,25 @@ class Udp_Client:
 
 
     # 入力の文字数チェック
-    def isValidLength(self, input: str, length: int) -> bool:
+    def is_valid_length(self, input: str, length: int) -> bool:
         l: int = len(input)
         return 0 < l and l <= length
 
     # ユーザ名入力、エンコード
-    def inputUsername(self) -> str:
-        while not self.isValidLength(self.username, 10):
+    def input_username(self) -> str:
+        while not self.is_valid_length(self.username, 10):
             self.username = input('user name(Up to 10 characters): ')
         
         return self.username
     
     # ポート入力
     def inputPort(self) -> None:
-        while not self.isValidLength(str(self.clientPort), 5):
+        while not self.is_valid_length(str(self.clientPort), 5):
             port = input('port(Up to 5 digits): ')
             self.clientPort = int(port)
     
     # 送信時間経過チェック
-    def checkTimeout(self) -> bool:
+    def check_timeout(self) -> bool:
         return time.perf_counter() - self.lastSendTime >= 60
 
     # 接続
@@ -223,10 +223,10 @@ class Udp_Client:
         self.inputPort()
 
         # ソケットとの紐づけ
-        self.setBind()
+        self.set_bind()
 
         # ユーザ名入力
-        usernameBits = self.inputUsername().encode('utf-8')
+        usernameBits = self.input_username().encode('utf-8')
 
         self.usernamelen = len(usernameBits)
 
@@ -246,9 +246,9 @@ class Udp_Client:
         self.sock.close()
 
 def main():
-    tcp_client_chat: Tcp_Client = Tcp_Client()
+    tcp_client_chat: TcpClient = TcpClient()
     
-    udp_client_chat: Udp_Client = Udp_Client()
+    udp_client_chat: UdpClient = UdpClient()
     udp_client_chat.communicate()
 
 main()

@@ -16,24 +16,26 @@ import threading
 import secrets
 import random
 
+import protocol
+
 class ChatRoom:
     def __init__(self, name) -> None:
-        self.name: str = ''
+        self.name: str = name
         # self.password: str = ''
         self.user_list: list[User] = []
         self.hostUser: str = ''
-        self.token: str = ''
-
 
 
 class User:
     def __init__(self, name: str) -> None:
-        self.name = name
+        self.name: str = name
+        self.token: str = ''
+        self.address: tuple[str, int]
 
 
 user_dict: dict[str, list] = {}
 
-class Tcp_Server:
+class TcpServer:
     def __init__(self) -> None:
         
         self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -47,16 +49,42 @@ class Tcp_Server:
         self.sock.bind((self.serverHost, self.serverPort))
         self.sock.listen(1)
 
-
     # データ送信
     def send(self, data: bytes, host: str, port: int) -> None:
         return 0
 
     # トークン作成
-    def createToken(self) -> str:
+    def create_token(self) -> str:
         digit = random.randrange(10, 128)
         return secrets.token_hex(digit)
 
+    # 応答ヘッダ作成
+    def set_response(self, roomname_size: int, operation: int, payload_size: int) -> bytes:
+        return protocol.create_header(roomname_size, operation, 1, payload_size)
+
+    # ルーム作成
+    def operation(self, connection: socket.socket, operation: int, header: bytes, body: bytes) -> None:
+        roomNameSize: int = int.from_bytes(header[0], 'big')
+        operation: int = int.from_bytes(header[1], 'big')
+        state: int = int.from_bytes(header[2], 'big')
+        roomName: str = body[:roomNameSize].decode('utf-8')
+        username: str = body[roomNameSize:].decode('utf-8')
+
+        if operation == 1:
+            state_bytes: bytes = (1).to_bytes(1, 'big')
+            connection.send(header[0] + header[1] + state_bytes + header[3:] + body)
+            chat_room: ChatRoom = ChatRoom(roomName)
+            chat_room.hostUser = username
+
+            token: str = self.create_token()
+            user: User = User(username)
+            chat_room.token = token
+            chat_room.user_list.append(user)
+
+            # トークンをクライアントに送信
+            connection.send()
+
+        
 
     def communication(self) -> None:
         
@@ -73,6 +101,7 @@ class Tcp_Server:
 
             header: bytes = data[:self.header_buff]
             body: bytes = data[self.header_buff:]
+
             roomNameSize: int = int.from_bytes(header[0], 'big')
             operation: int = int.from_bytes(header[1], 'big')
             state: int = int.from_bytes(header[2], 'big')
@@ -99,13 +128,7 @@ class Tcp_Server:
 
 
 
-
-
-
-
-
-
-class Udp_Server:
+class UdpServer:
     def __init__(self) -> None:
         self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.serverHost: str = '0.0.0.0'
@@ -115,7 +138,7 @@ class Udp_Server:
         self.user_dict: dict[str, tuple] = {}
 
     # ソケット紐づけ
-    def setBind(self) -> None:
+    def set_bind(self) -> None:
         self.sock.bind((self.serverHost, self.serverPort))
         print('Waiting for receive data.')
     
@@ -129,11 +152,11 @@ class Udp_Server:
         return  self.sock.recvfrom(self.buffer)
 
     # ユーザの存在確認
-    def isExistUser(self, username: str) -> bool:
+    def is_exist_user(self, username: str) -> bool:
         return username in self.user_dict.keys()
 
     def communication(self) -> None:
-        self.setBind()
+        self.set_bind()
         try:
             while True:
                 # 型ヒント
@@ -147,7 +170,7 @@ class Udp_Server:
                 username: str = receiveData[1:1 + usernamelen].decode('utf-8')
                 msg: str = receiveData[1 + usernamelen:].decode('utf-8')
                 
-                if not self.isExistUser(username):
+                if not self.is_exist_user(username):
                     self.user_dict[username] = address
 
                 # タイムアウトユーザ、退出ユーザをリレーシステムから削除
@@ -164,7 +187,7 @@ class Udp_Server:
 
 def main():
 
-    udp_server_chat: Udp_Server = Udp_Server()
+    udp_server_chat: UdpServer = UdpServer()
     udp_server_chat.communication()
 
 main()
