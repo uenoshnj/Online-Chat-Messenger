@@ -1,12 +1,18 @@
 
 # データをバイトに変換
-def create_header(roomname_size: int, operation: int, state: int, payload_size: int) -> bytes:
+def create_header(operation: int, state: int, roomname: str, payload: str) -> bytes:
+    roomname_size = _get_roomname_size(roomname)
+    payload_size = _get_payload_size(payload)
     return roomname_size.to_bytes(1, 'big') + operation.to_bytes(1, 'big') + state.to_bytes(1, 'big') + payload_size.to_bytes(29, 'big')
 
 def create_body(roomname: str, payload: str) -> bytes:
     return roomname.encode('utf-8') + payload.encode('utf-8')
 
+def _get_roomname_size(roomname: str) -> int:
+    return len(roomname.encode('utf-8'))
 
+def _get_payload_size(payload: str) -> int:
+    return len(payload.encode('utf-8'))
 
 # バイトデータを変換
 def _get_header(data: bytes) -> bytes:

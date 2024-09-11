@@ -25,15 +25,14 @@ class ChatRoom:
         self.user_list: list[User] = []
         self.hostUser: str = ''
 
+room_list: ChatRoom = []
+
 
 class User:
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, token: str, address: tuple[str, int]) -> None:
         self.name: str = name
-        self.token: str = ''
-        self.address: tuple[str, int]
-
-
-user_dict: dict[str, list] = {}
+        self.token: str = token
+        self.address: tuple[str, int] = address
 
 class TcpServer:
     def __init__(self) -> None:
@@ -49,44 +48,48 @@ class TcpServer:
         self.sock.bind((self.serverHost, self.serverPort))
         self.sock.listen(1)
 
-    # データ送信
-    def send(self, data: bytes, host: str, port: int) -> None:
-        return 0
-
     # トークン作成
     def create_token(self) -> str:
         digit = random.randrange(10, 128)
         return secrets.token_hex(digit)
-
-    # 応答ヘッダ作成
-    def set_response(self, roomname_size: int, operation: int, payload_size: int) -> bytes:
-        return protocol.create_header(roomname_size, operation, 1, payload_size)
-
+    
     # ルーム作成
-    def operation(self, connection: socket.socket, operation: int, data:bytes) -> None:
-        roomname_size: int = protocol.get_roomname_size(header)
-        operation: int = protocol.get_operation(header)
-        state: int = protocol.get_state(header)
-        roomname: str = protocol.get_roomname(body, roomname_size)
-        username: str = protocol.get_payload(body, roomname_size)
+    def _create_room(self, roomname: str, username: str, user: User) -> None:
+        chat_room: ChatRoom = ChatRoom(roomname)
+        chat_room.hostUser = username
+        chat_room.user_list.append(user)
+        room_list.append(chat_room)
 
-        connection.send(self.set_response(roomname_size, operation, len(username)))
+    # ルームへユーザを追加
+    def _add_to_room(self, roomname: str, user: User) -> None:
+        for room in room_list:
+            if room.name == roomname:
+                room.user_list.append(user)
+
+    # 操作
+    def _operation(self, connection: socket.socket, address: tuple[str, int],  data: bytes) -> None:
+        operation: int = protocol.get_operation(data)
+        roomname: str = protocol.get_roomname(data)
+        username: str = protocol.get_payload(data)
+
+        # 応答
+        connection.send(protocol.create_header(operation, 1, roomname, username))
+
+        # トークン作成
+        token: str = self.create_token()
+
+        # ユーザ作成
+        user: User = User(username, token, address)
 
         if operation == 1:
-            state_bytes: bytes = (1).to_bytes(1, 'big')
-            connection.send(header[0] + header[1] + state_bytes + header[3:] + body)
-            chat_room: ChatRoom = ChatRoom(roomname)
-            chat_room.hostUser = username
+            self._create_room(roomname, username, user)
 
-            token: str = self.create_token()
-            user: User = User(username)
-            chat_room.token = token
-            chat_room.user_list.append(user)
+        elif operation == 2:
+            self._add_to_room(roomname, user)
 
             # トークンをクライアントに送信
-            connection.send()
+        connection.send(protocol.create_header(operation, 2, roomname, token) + protocol.create_body(roomname, token))
 
-        
 
     def communication(self) -> None:
         
@@ -101,33 +104,8 @@ class TcpServer:
 
             data: bytes = connection.recv(self.header_buff + self.payload_buff)
 
-            header: bytes = data[:self.header_buff]
-            body: bytes = data[self.header_buff:]
-
-            roomname_size: int = int.from_bytes(header[0], 'big')
-            operation: int = int.from_bytes(header[1], 'big')
-            state: int = int.from_bytes(header[2], 'big')
-            roomname: str = body[:roomname_size].decode('utf-8')
-            username: str = body[roomname_size:].decode('utf-8')
-
-            if operation == 1:
-                state: int = 1
-                state_bytes: bytes = state.to_bytes(1, 'big')
-                connection.send(header[0] + header[1] + state_bytes + header[3:] + body)
-                
-                chatRoom: ChatRoom = ChatRoom(roomname)
-                chatRoom.hostUser = username
-
-                # トークン作成
-                token: str = self.createToken()
-
-                user: User = User(username)
-                chatRoom.token = token
-                chatRoom.user_list.append(user)
-
-
-                connection.send()
-
+            self._operation(connection, address, data)
+            
 
 
 class UdpServer:
