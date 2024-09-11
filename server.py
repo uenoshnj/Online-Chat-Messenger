@@ -63,17 +63,19 @@ class TcpServer:
         return protocol.create_header(roomname_size, operation, 1, payload_size)
 
     # ルーム作成
-    def operation(self, connection: socket.socket, operation: int, header: bytes, body: bytes) -> None:
-        roomNameSize: int = int.from_bytes(header[0], 'big')
-        operation: int = int.from_bytes(header[1], 'big')
-        state: int = int.from_bytes(header[2], 'big')
-        roomName: str = body[:roomNameSize].decode('utf-8')
-        username: str = body[roomNameSize:].decode('utf-8')
+    def operation(self, connection: socket.socket, operation: int, data:bytes) -> None:
+        roomname_size: int = protocol.get_roomname_size(header)
+        operation: int = protocol.get_operation(header)
+        state: int = protocol.get_state(header)
+        roomname: str = protocol.get_roomname(body, roomname_size)
+        username: str = protocol.get_payload(body, roomname_size)
+
+        connection.send(self.set_response(roomname_size, operation, len(username)))
 
         if operation == 1:
             state_bytes: bytes = (1).to_bytes(1, 'big')
             connection.send(header[0] + header[1] + state_bytes + header[3:] + body)
-            chat_room: ChatRoom = ChatRoom(roomName)
+            chat_room: ChatRoom = ChatRoom(roomname)
             chat_room.hostUser = username
 
             token: str = self.create_token()
@@ -102,18 +104,18 @@ class TcpServer:
             header: bytes = data[:self.header_buff]
             body: bytes = data[self.header_buff:]
 
-            roomNameSize: int = int.from_bytes(header[0], 'big')
+            roomname_size: int = int.from_bytes(header[0], 'big')
             operation: int = int.from_bytes(header[1], 'big')
             state: int = int.from_bytes(header[2], 'big')
-            roomName: str = body[:roomNameSize].decode('utf-8')
-            username: str = body[roomNameSize:].decode('utf-8')
+            roomname: str = body[:roomname_size].decode('utf-8')
+            username: str = body[roomname_size:].decode('utf-8')
 
             if operation == 1:
                 state: int = 1
                 state_bytes: bytes = state.to_bytes(1, 'big')
                 connection.send(header[0] + header[1] + state_bytes + header[3:] + body)
                 
-                chatRoom: ChatRoom = ChatRoom(roomName)
+                chatRoom: ChatRoom = ChatRoom(roomname)
                 chatRoom.hostUser = username
 
                 # トークン作成
