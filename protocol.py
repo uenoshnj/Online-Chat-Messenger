@@ -23,19 +23,19 @@ def _get_body(data: bytes) -> bytes:
 
 def get_roomname_size(data: bytes) -> int:
     header: bytes = _get_header(data)
-    return int.from_bytes(header[0], 'big')
+    return header[0]
 
 def get_operation(data: bytes) -> int:
     header: bytes = _get_header(data)
-    return int.from_bytes(header[1], 'big')
+    return header[1]
 
 def get_state(data: bytes) -> int:
     header: bytes = _get_header(data)
-    return int.from_bytes(header[2], 'big')
+    return header[2]
 
 def get_payload_size(data: bytes) -> int:
     header: bytes = _get_header(data)
-    return int.from_bytes(header[3:], 'big')
+    return header[3:]
 
 def get_roomname(data: bytes) -> str:
     header: bytes = _get_header(data)
