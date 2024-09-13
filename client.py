@@ -27,7 +27,9 @@ class TcpClient:
         self.username: str = ''
         self.operation: int = 0
         self.state: int = 0
-
+        self.ROOM_EXISTS_STATE: int = 3
+        self.ROOM_NOT_EXISTS_STATE: int = 4
+        self.USER_EXISTS_STATE: int = 5
 
     # 接続
     def connect(self) -> None:
@@ -71,6 +73,28 @@ class TcpClient:
     def receive(self) -> None:
         self.sock.recv()
 
+    # ステートチェック
+    def _check_state(self, data: bytes) -> None:
+        state = protocol.get_state(data)
+        
+        # 作成するルームが存在する場合
+        if state == self.ROOM_EXISTS_STATE:
+            print(f'[TCP]Room {protocol.get_roomname(data)} already exists, close connection')
+            self.sock.close()
+            sys.exit(1)
+
+        # 参加対象のルームが存在しない場合
+        if state == self.ROOM_NOT_EXISTS_STATE:
+            print(f'[TCP]Room {protocol.get_roomname(data)} does not exist, close connection')
+            self.sock.close()
+            sys.exit(1)
+        
+        # ユーザが既に存在する場合
+        if state == self.USER_EXISTS_STATE:
+            print(f'[TCP]Username:{protocol.get_payload(data)} already exist, close connection')
+            self.sock.close()
+            sys.exit(1)
+
     #
     def communication(self) -> None:
         # サーバへ接続
@@ -101,18 +125,16 @@ class TcpClient:
         if self.operation == 1:
             # 完了
             data: bytes = self.sock.recv(4096)
+            self._check_state(data)
             print(f'[TCP]{protocol.get_roomname(data)} created')
 
         # ルーム参加
         else :
             # 完了
             data: bytes = self.sock.recv(4096)
-            if protocol.get_state(data) != 2:
-                print(f'[TCP]Failed to join {protocol.get_roomname(data)}, close the connection')
-                self.sock.close()
-                sys.exit(1)
-            else:
-                print(f'[TCP]join {protocol.get_roomname(data)}')
+            self._check_state(data)
+            print(f'[TCP]Joined {protocol.get_roomname(data)}')
+
 
 
 

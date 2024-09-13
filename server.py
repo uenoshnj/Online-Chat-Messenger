@@ -36,12 +36,14 @@ class User:
 
 class TcpServer:
     def __init__(self) -> None:
-        
         self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serverHost: str = '0.0.0.0'
         self.serverPort: int = 9001
         self.header_buff: int = 32
         self.payload_buff: int = 37
+        self.ROOM_EXISTS_STATE: int = 3
+        self.ROOM_NOT_EXISTS_STATE: int = 4
+        self.USER_EXISTS_STATE: int = 5
 
     # 接続受け付け
     def listen(self) -> None:
@@ -55,9 +57,9 @@ class TcpServer:
         return secrets.token_hex(digit)
     
     # ルーム作成
-    def _create_room(self, roomname: str, username: str, user: User) -> None:
+    def _create_room(self, roomname: str, user: User) -> None:
         chat_room: ChatRoom = ChatRoom(roomname)
-        chat_room.hostUser = username
+        chat_room.hostUser = user.name
         chat_room.user_list.append(user)
         room_list.append(chat_room)
 
@@ -70,45 +72,74 @@ class TcpServer:
         
         return False
 
-    # 同じルーム名内でのユーザ名重複チェック
-    def _check_same_username(self, roomname: str, username: str) -> bool:
-        if roomname not in room_list.name:
-            return False
-        # for user in room.user_list:
-        #     print(f'ユーザ名{user.name}、入力：{username}')
-        #     if user.name == username:
-        #         return False
+    # ルーム存在チェック
+    def _room_exists(self, roomname: str) -> bool | ChatRoom:
+        for room in room_list:
+            if room.name == roomname:
+                return room
 
-        return True
+        return False
+
+
+    # ルーム内でのユーザ名重複チェック
+    def _username_exists(self, chat_room: ChatRoom, username: str) -> bool:
+        for user in chat_room.user_list:
+            if user.name == username:
+                return True
+        return False
 
     # 操作
-    def _operation(self, connection: socket.socket, address: tuple[str, int],  data: bytes) -> None:
+    def _operation(self, connection: socket.socket, address: tuple[str, int],  data: bytes) -> int:
         operation: int = protocol.get_operation(data)
         roomname: str = protocol.get_roomname(data)
         username: str = protocol.get_payload(data)
 
-        # チャットルームに同名ユーザがいるか確認
-        connection.send(protocol.create_header(operation, 1, roomname, username)) \
-        if self._check_same_username(roomname, username) \
-        else connection.send(protocol.create_header(operation, 3, roomname, username))
-
-        # トークン作成
-        token: str = self.create_token()
-
-        # ユーザ作成
-        user: User = User(username, token, address)
+        # 応答
+        connection.send(protocol.create_header(operation, 1, roomname, username))
 
         if operation == 1:
-            self._create_room(roomname, username, user)
+            # 同一ルーム名の存在確認
+            if self._room_exists(roomname):
+                connection.send(protocol.create_header(operation, self.ROOM_EXISTS_STATE, roomname, username))
+                return 1
+
+            # トークン作成
+            token: str = self.create_token()
+            
+            # ユーザ作成
+            user: User = User(username, token, address)
+            
+            # ルーム作成
+            self._create_room(roomname, user)
+            
             # トークンをクライアントに送信
             connection.send(protocol.create_header(operation, 2, roomname, token) + protocol.create_body(roomname, token))
 
+            return 0
+
 
         elif operation == 2:
-            connection.send(protocol.create_header(operation, 2, roomname, token) + protocol.create_body(roomname, token)) \
-            if self._add_to_room(roomname, user) \
-            else connection.send(protocol.create_header(operation, 3, roomname, token) + protocol.create_body(roomname, token)) 
+            # ルーム名の存在確認し、存在しなければクライアントにルーム存在なしを返却
+            chat_room: ChatRoom = self._room_exists(roomname)
+            if chat_room:
+                # トークン作成
+                token: str = self.create_token()
+                # ユーザ作成
+                user: User = User(username, token, address)
 
+            else:
+                connection.send(protocol.create_header(operation, self.ROOM_NOT_EXISTS_STATE, roomname, username))
+                return 1
+            
+            # ユーザの存在を確認し、存在している場合はクライアントにユーザ存在を返却
+            if self._username_exists(chat_room, username):
+                connection.send(protocol.create_header(operation, self.USER_EXISTS_STATE, roomname, username))
+                return 1
+            
+            else:
+                connection.send(protocol.create_header(operation, 2, roomname, token) + protocol.create_body(roomname, token))
+
+            return 0
 
 
     def communication(self) -> None:
