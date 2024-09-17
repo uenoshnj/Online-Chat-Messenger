@@ -79,23 +79,20 @@ class TcpClient:
         
         # 作成するルームが存在する場合
         if state == self.ROOM_EXISTS_STATE:
-            print(f'[TCP]Room {protocol.get_roomname(data)} already exists, close connection')
-            self.sock.close()
-            sys.exit(1)
+            print(f'[TCP]Room:{protocol.get_roomname(data)} already exists, close connection')
 
         # 参加対象のルームが存在しない場合
         if state == self.ROOM_NOT_EXISTS_STATE:
-            print(f'[TCP]Room {protocol.get_roomname(data)} does not exist, close connection')
-            self.sock.close()
-            sys.exit(1)
+            print(f'[TCP]Room:{protocol.get_roomname(data)} does not exist, close connection')
         
         # ユーザが既に存在する場合
         if state == self.USER_EXISTS_STATE:
             print(f'[TCP]Username:{protocol.get_payload(data)} already exist, close connection')
-            self.sock.close()
-            sys.exit(1)
 
-    #
+        self.sock.close()
+        sys.exit(1)
+
+    # サーバと通信
     def communication(self) -> None:
         # サーバへ接続
         self.connect()
@@ -112,13 +109,9 @@ class TcpClient:
 
         self.server_init(tcpr)
 
+
         # 準拠
         data: bytes = self.sock.recv(32)
-        if protocol.get_state(data) != 1:
-            print(f'[TCP]Username:{protocol.get_payload(data)} is already exist, close the connection')
-            self.sock.close()
-            sys.exit(1)
-        
         print(f'[TCP]server is processing. Wait for a minute...')
 
         # ルーム作成
@@ -134,9 +127,6 @@ class TcpClient:
             data: bytes = self.sock.recv(4096)
             self._check_state(data)
             print(f'[TCP]Joined {protocol.get_roomname(data)}')
-
-
-
 
 
 # class UdpClient:
