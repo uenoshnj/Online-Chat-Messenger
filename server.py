@@ -141,7 +141,7 @@ class TcpServer:
 
             return 0
 
-
+    # クライアントと通信
     def communication(self) -> None:
         
         self.listen()
