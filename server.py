@@ -25,7 +25,7 @@ class ChatRoom:
         self.user_list: list[User] = []
         self.hostUser: str = ''
 
-room_list: ChatRoom = []
+room_list: list[ChatRoom] = []
 
 
 class User:
