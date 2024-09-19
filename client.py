@@ -131,7 +131,7 @@ class TcpClient:
 
 
 class UdpClient:
-    def __init__(self, client_host: str, client_port: int, roomname: str, token: str) -> None:
+    def __init__(self, client_host: str, client_port: int, roomname: str, username: str, token: str) -> None:
         self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.server_host: str = '0.0.0.0'
         self.server_port: int = 9001
@@ -139,6 +139,7 @@ class UdpClient:
         self.client_port: int = client_port
 
         self.roomname: str = roomname
+        self.username: str = username
         self.token: str = token
         self.buffer: int = 4096
 
@@ -154,10 +155,12 @@ class UdpClient:
     def send(self) -> None:
         while True:    
             message: str = input()
-            if self.check_timeout():
+            if self._check_timeout():
                 message = 'exit'
                 print('Time out!')
-            data: bytes = self.usernamelen.to_bytes(1, 'big') + f'{self.username}{message}'.encode('utf-8')
+            header: bytes = protocol.create_header(self.roomname, self.token)
+            body: bytes = protocol.create_body(self.roomname, self.token, message)
+            data: bytes = header + body
             self.sock.sendto(data, (self.server_host, self.server_port))
             self.last_send_time = time.perf_counter()
 
@@ -170,17 +173,9 @@ class UdpClient:
     def receive(self) -> None:
         while True:
             data: bytes = self.sock.recv(self.buffer)
-            usernamelen = int.from_bytes(data[:1], 'big')
-            username = data[1:1+usernamelen].decode('utf-8')
-            message = data[1+usernamelen:].decode('utf-8')
+            message: str = protocol.get_message(data)
 
-            if message == 'exit' and username == self.username:
-                self.sock.close()
-                break
-            elif message == 'exit':
-                print(f'{username} leave chat')
-            else:
-                print(f'{username} : {message}')
+            print(message)
 
 
     # 入力の文字数チェック
@@ -202,7 +197,7 @@ class UdpClient:
     #         self.client_port = int(port)
     
     # 送信時間経過チェック
-    def check_timeout(self) -> bool:
+    def _check_timeout(self) -> bool:
         return time.perf_counter() - self.last_send_time >= 60
 
     # 接続
