@@ -141,7 +141,7 @@ class TcpServer:
 
             return 0
 
-    # クライアントと通信
+
     def communication(self) -> None:
         
         self.listen()
@@ -157,68 +157,79 @@ class TcpServer:
             data: bytes = connection.recv(self.header_buff + self.payload_buff)
 
             self._operation(connection, address, data)
-            
 
 
-# class UdpServer:
-#     def __init__(self) -> None:
-#         self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-#         self.serverHost: str = '0.0.0.0'
-#         self.serverPort: int = 9001
+class UdpServer:
+    def __init__(self, roomname) -> None:
+        self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.serverHost: str = '0.0.0.0'
+        self.serverPort: int = 9001
 
-#         self.buffer: int = 4096
-#         self.user_dict: dict[str, tuple] = {}
+        self.buffer: int = 4096
+        self.roomname = roomname
+        # self.user_dict: dict[str, tuple] = {}
 
-#     # ソケット紐づけ
-#     def set_bind(self) -> None:
-#         self.sock.bind((self.serverHost, self.serverPort))
-#         print('Waiting for receive data.')
+    # ソケット紐づけ
+    def set_bind(self) -> None:
+        self.sock.bind((self.serverHost, self.serverPort))
+        print('Waiting for receive data.')
     
-#     # データ送信
-#     def send(self, sendData: bytes) -> None:
-#         for address in self.user_dict.values():
-#             self.sock.sendto(sendData, address)
+    # データ送信
+    def send(self, send_data: bytes) -> None:
+        for room in room_list:
+            for user in room.user_list:
+                self.sock.sendto(send_data, user.address)
 
-#     # データ受信
-#     def receive(self) -> bytes:
-#         return  self.sock.recvfrom(self.buffer)
 
-#     # ユーザの存在確認
-#     def is_exist_user(self, username: str) -> bool:
-#         return username in self.user_dict.keys()
+    # データ受信
+    def receive(self) -> bytes:
+        return  self.sock.recvfrom(self.buffer)
 
-#     def communication(self) -> None:
-#         self.set_bind()
-#         try:
-#             while True:
-#                 # 型ヒント
-#                 receiveData: bytes
-#                 address: tuple
+    # ユーザの存在確認
+    def is_exist_user(self, username: str) -> bool:
+        return username in self.user_dict.keys()
+
+    def communication(self) -> None:
+        self.set_bind()
+        try:
+            while True:
+                # 型ヒント
+                receiveData: bytes
+                address: tuple
                 
-#                 receiveData, address = self.receive()
+                receiveData, address = self.receive()
                 
-#                 # バイトから文字列に変換
-#                 usernamelen: int = int.from_bytes(receiveData[:1], 'big')
-#                 username: str = receiveData[1:1 + usernamelen].decode('utf-8')
-#                 msg: str = receiveData[1 + usernamelen:].decode('utf-8')
+                # バイトから文字列に変換
+                usernamelen: int = int.from_bytes(receiveData[:1], 'big')
+                username: str = receiveData[1:1 + usernamelen].decode('utf-8')
+                msg: str = receiveData[1 + usernamelen:].decode('utf-8')
                 
-#                 if not self.is_exist_user(username):
-#                     self.user_dict[username] = address
+                if not self.is_exist_user(username):
+                    self.user_dict[username] = address
 
-#                 # タイムアウトユーザ、退出ユーザをリレーシステムから削除
-#                 if msg == 'exit':
-#                     print(f"delete {username} from relay")
-#                     del self.user_dict[username]
+                # タイムアウトユーザ、退出ユーザをリレーシステムから削除
+                if msg == 'exit':
+                    print(f"delete {username} from relay")
+                    del self.user_dict[username]
 
-#                 self.send(receiveData)
+                self.send(receiveData)
             
-#         finally:
-#             self.sock.close()
+        finally:
+            self.sock.close()
 
     
 
 def main():
     tcp_server: TcpServer = TcpServer()
-    tcp_server.communication()
+    udp_server: UdpServer = UdpServer()
+
+    thread_tcp: threading = threading.Thread(target=tcp_server.communication)
+    thread_udp: threading = threading.Thread(target=udp_server.communication)
+
+    thread_tcp.start()
+    thread_udp.start()
+
+    thread_tcp.join()
+    thread_udp.join()
     
 main()
