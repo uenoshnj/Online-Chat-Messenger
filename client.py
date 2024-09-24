@@ -25,6 +25,7 @@ class TcpClient:
 
         self.roomname: str = ''
         self.username: str = ''
+        self.token: str = ''
         self.operation: int = 0
         self.state: int = 0
         self.ROOM_EXISTS_STATE: int = 3
@@ -32,7 +33,7 @@ class TcpClient:
         self.USER_EXISTS_STATE: int = 5
 
     # 接続
-    def connect(self) -> None:
+    def _connect(self) -> None:
         print(f'[TCP]Connect to {self.server_host}:{self.server_port}')
         try:
             self.sock.connect((self.server_host, self.server_port))
@@ -95,20 +96,18 @@ class TcpClient:
     # サーバと通信
     def communication(self) -> None:
         # サーバへ接続
-        self.connect()
+        self._connect()
 
         # ルーム名、ユーザ名、操作の入力
         self._input_roomname()
         self._input_username()
         self._input_operation()
-        
 
         header: bytes = protocol.create_header(self.operation, self.state, self.roomname, self.username)
         body: bytes = protocol.create_body(self.roomname, self.username)
         tcpr: bytes = header + body
 
         self.server_init(tcpr)
-
 
         # 準拠
         data: bytes = self.sock.recv(32)
@@ -120,6 +119,7 @@ class TcpClient:
             # 完了
             data: bytes = self.sock.recv(4096)
             self._check_state(data)
+            self.token = protocol.get_payload(data)
             print(f'[TCP]{protocol.get_roomname(data)} created')
 
         # ルーム参加
@@ -127,6 +127,7 @@ class TcpClient:
             # 完了
             data: bytes = self.sock.recv(4096)
             self._check_state(data)
+            self.token = protocol.get_payload(data)
             print(f'[TCP]Joined {protocol.get_roomname(data)}')
 
 
@@ -182,19 +183,6 @@ class UdpClient:
     def is_valid_length(self, input: str, length: int) -> bool:
         l: int = len(input)
         return 0 < l and l <= length
-
-    # # ユーザ名入力
-    # def input_username(self) -> str:
-    #     while not self.is_valid_length(self.username, 10):
-    #         self.username = input('user name(Up to 10 characters): ')
-        
-    #     return self.username
-    
-    # # ポート入力
-    # def inputPort(self) -> None:
-    #     while not self.is_valid_length(str(self.client_port), 5):
-    #         port = input('port(Up to 5 digits): ')
-    #         self.client_port = int(port)
     
     # 送信時間経過チェック
     def _check_timeout(self) -> bool:
@@ -202,28 +190,21 @@ class UdpClient:
 
     # 接続
     def communicate(self) -> None:
-        # # ポート入力
-        # self.inputPort()
 
         # ソケットとの紐づけ
         self.set_bind()
 
-        # # ユーザ名入力
-        # usernameBits = self.input_username().encode('utf-8')
-
-        # self.usernamelen = len(usernameBits)
-
         print("\nChat start!\nif you want to leave, enter 'exit'\n")
 
         # スレッドの作成、実行
-        sendThread: threading.Thread = threading.Thread(target=self.send)
-        receiveThread: threading.Thread = threading.Thread(target=self.receive)
+        send_thread: threading.Thread = threading.Thread(target=self.send)
+        receive_thread: threading.Thread = threading.Thread(target=self.receive)
 
-        sendThread.start()
-        receiveThread.start()
+        send_thread.start()
+        receive_thread.start()
 
-        sendThread.join()
-        receiveThread.join()
+        send_thread.join()
+        receive_thread.join()
 
         print('close connection')
         self.sock.close()
@@ -232,7 +213,7 @@ def main():
     tcp_client_chat: TcpClient = TcpClient()
     tcp_client_chat.communication()
     
-    # udp_client_chat: UdpClient = UdpClient()
-    # udp_client_chat.communicate()
+    udp_client_chat: UdpClient = UdpClient()
+    udp_client_chat.communicate(tcp_client_chat.client_host, tcp_client_chat.client_port, tcp_client_chat.roomname, tcp_client_chat.username, tcp_client_chat.token)
 
 main()

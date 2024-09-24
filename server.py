@@ -11,7 +11,6 @@
 import os
 import socket
 import sys
-import time
 import threading
 import secrets
 import random
@@ -24,6 +23,11 @@ class ChatRoom:
         # self.password: str = ''
         self.user_list: list[User] = []
         self.hostUser: str = ''
+
+    def delete_user(self, token: str) -> None:
+        for user in self.user_list:
+            if user.token == token:
+                self.user_list.remove(user)
 
 room_list: list[ChatRoom] = []
 
@@ -160,60 +164,96 @@ class TcpServer:
 
 
 class UdpServer:
-    def __init__(self, roomname) -> None:
+    def __init__(self) -> None:
         self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.serverHost: str = '0.0.0.0'
         self.serverPort: int = 9001
 
         self.buffer: int = 4096
-        self.roomname = roomname
-        # self.user_dict: dict[str, tuple] = {}
+
 
     # ソケット紐づけ
-    def set_bind(self) -> None:
+    def _set_bind(self) -> None:
         self.sock.bind((self.serverHost, self.serverPort))
-        print('Waiting for receive data.')
+        print('[UDP]Waiting for receive data.')
     
     # データ送信
-    def send(self, send_data: bytes) -> None:
-        for room in room_list:
-            for user in room.user_list:
-                self.sock.sendto(send_data, user.address)
+    def _send(self, send_data: bytes, room: ChatRoom) -> None:
+        for user in room.user_list:
+            self.sock.sendto(send_data, user.address)
 
 
     # データ受信
-    def receive(self) -> bytes:
+    def _receive(self) -> bytes:
         return  self.sock.recvfrom(self.buffer)
 
-    # ユーザの存在確認
-    def is_exist_user(self, username: str) -> bool:
-        return username in self.user_dict.keys()
+    # ルーム取得
+    def _get_room(self, roomname: str) -> ChatRoom | bool:
+        for room in room_list:
+            if room.name == roomname:
+                return room
+
+        return False
+    
+    def _get_user(self, room: ChatRoom, token: str) -> User | bool:
+        for user in room.user_list:
+            if user.token == token:
+                return user
+
+        return False
+
+    # ユーザトークン存在確認
+    def _token_exists(self, token: str, room: ChatRoom) -> bool:
+        for user in room.user_list:
+            if user.token == token:
+                return True
+
+        return False
 
     def communication(self) -> None:
-        self.set_bind()
+        self._set_bind()
         try:
             while True:
                 # 型ヒント
-                receiveData: bytes
+                receive_data: bytes
                 address: tuple
                 
-                receiveData, address = self.receive()
+                receive_data, address = self._receive()
                 
                 # バイトから文字列に変換
-                usernamelen: int = int.from_bytes(receiveData[:1], 'big')
-                username: str = receiveData[1:1 + usernamelen].decode('utf-8')
-                msg: str = receiveData[1 + usernamelen:].decode('utf-8')
+                roomname: str = protocol.get_udp_roomname(receive_data)
+                token: str = protocol.get_udp_token(receive_data)
+                msg: str = protocol.get_message(receive_data)
                 
-                if not self.is_exist_user(username):
-                    self.user_dict[username] = address
+                # ヘッダー作成
+                header: bytes = protocol.create_udp_header(roomname, token)
 
-                # タイムアウトユーザ、退出ユーザをリレーシステムから削除
+                # ルーム名からユーザの参加中のルームを特定し、ルームの存在確認
+                user_room: ChatRoom = self._get_room(roomname)
+                if user_room == False:
+                    body: bytes = protocol.create_udp_body(roomname, token, "room not exists!")
+                    self.sock.sendto(header + body, address)
+                    continue
+                
+                # トークンからユーザを特定し、ユーザの存在確認
+                user: User = self._get_user(user_room, token)
+                if user == False:
+                    body: bytes = protocol.create_udp_body(roomname, token, "you're not join room")
+                    self.sock.sendto(header + body, address)
+                    continue
+
+                # タイムアウトユーザ、退出ユーザをリレーシステムから削除、ホストユーザの場合はチャットルームも削除
                 if msg == 'exit':
-                    print(f"delete {username} from relay")
-                    del self.user_dict[username]
+                    user_room.delete_user(token)
+                    if user.name == user_room.hostUser:
+                        room_list.remove(user_room)
+                    continue
 
-                self.send(receiveData)
-            
+                msg = f'{user.name} : {msg}'
+
+                body: bytes = protocol.create_udp_body(roomname, token, msg)
+                self._send(header + body, user_room)
+
         finally:
             self.sock.close()
 
@@ -223,13 +263,17 @@ def main():
     tcp_server: TcpServer = TcpServer()
     udp_server: UdpServer = UdpServer()
 
-    thread_tcp: threading = threading.Thread(target=tcp_server.communication)
-    thread_udp: threading = threading.Thread(target=udp_server.communication)
+    tcp_server.communication()
+    udp_server.communication()
 
-    thread_tcp.start()
-    thread_udp.start()
+    # thread_tcp: threading = threading.Thread(target=tcp_server.communication)
+    # thread_udp: threading = threading.Thread(target=udp_server.communication)
 
-    thread_tcp.join()
-    thread_udp.join()
+    # thread_tcp.start()
+    # thread_udp.start()
+
+    # thread_tcp.join()
+    # thread_udp.join()
+    
     
 main()
