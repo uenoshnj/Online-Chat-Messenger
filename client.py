@@ -81,17 +81,21 @@ class TcpClient:
         # 作成するルームが存在する場合
         if state == self.ROOM_EXISTS_STATE:
             print(f'[TCP]Room:{protocol.get_roomname(data)} already exists, close connection')
+            self.sock.close()
+            sys.exit(1)
 
         # 参加対象のルームが存在しない場合
         if state == self.ROOM_NOT_EXISTS_STATE:
             print(f'[TCP]Room:{protocol.get_roomname(data)} does not exist, close connection')
+            self.sock.close()
+            sys.exit(1)
         
         # ユーザが既に存在する場合
         if state == self.USER_EXISTS_STATE:
             print(f'[TCP]Username:{protocol.get_payload(data)} already exist, close connection')
+            self.sock.close()
+            sys.exit(1)
 
-        self.sock.close()
-        sys.exit(1)
 
     # サーバと通信
     def communication(self) -> None:
@@ -159,8 +163,8 @@ class UdpClient:
             if self._check_timeout():
                 message = 'exit'
                 print('Time out!')
-            header: bytes = protocol.create_header(self.roomname, self.token)
-            body: bytes = protocol.create_body(self.roomname, self.token, message)
+            header: bytes = protocol.create_udp_header(self.roomname, self.token)
+            body: bytes = protocol.create_udp_body(self.roomname, self.token, message)
             data: bytes = header + body
             self.sock.sendto(data, (self.server_host, self.server_port))
             self.last_send_time = time.perf_counter()
@@ -213,7 +217,7 @@ def main():
     tcp_client_chat: TcpClient = TcpClient()
     tcp_client_chat.communication()
     
-    udp_client_chat: UdpClient = UdpClient()
-    udp_client_chat.communicate(tcp_client_chat.client_host, tcp_client_chat.client_port, tcp_client_chat.roomname, tcp_client_chat.username, tcp_client_chat.token)
+    udp_client_chat: UdpClient = UdpClient(tcp_client_chat.client_host, tcp_client_chat.client_port, tcp_client_chat.roomname, tcp_client_chat.username, tcp_client_chat.token)
+    udp_client_chat.communicate()
 
 main()
