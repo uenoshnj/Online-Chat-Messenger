@@ -67,15 +67,6 @@ class TcpServer:
         chat_room.user_list.append(user)
         room_list.append(chat_room)
 
-    # ルームへユーザを追加
-    def _add_to_room(self, roomname: str, user: User) -> bool:
-        for room in room_list:
-            if room.name == roomname:
-                room.user_list.append(user)
-                return True
-        
-        return False
-
     # ルーム存在チェック
     def _room_exists(self, roomname: str) -> bool | ChatRoom:
         for room in room_list:
@@ -141,7 +132,9 @@ class TcpServer:
                 return 1
             
             else:
+                chat_room.user_list.append(user)
                 connection.send(protocol.create_header(operation, 2, roomname, token) + protocol.create_body(roomname, token))
+
 
             return 0
 
@@ -156,7 +149,7 @@ class TcpServer:
             address: tuple[str, int]
 
             connection, address = self.sock.accept()
-            print(f'connected by {address}')
+            print(f'[TCP]connected by {address}')
 
             data: bytes = connection.recv(self.header_buff + self.payload_buff)
 
@@ -175,7 +168,6 @@ class UdpServer:
     # ソケット紐づけ
     def _set_bind(self) -> None:
         self.sock.bind((self.serverHost, self.serverPort))
-        print('[UDP]Waiting for receive data.')
     
     # データ送信
     def _send(self, send_data: bytes, room: ChatRoom) -> None:
@@ -263,17 +255,17 @@ def main():
     tcp_server: TcpServer = TcpServer()
     udp_server: UdpServer = UdpServer()
 
-    tcp_server.communication()
-    udp_server.communication()
+    # tcp_server.communication()
+    # udp_server.communication()
 
-    # thread_tcp: threading = threading.Thread(target=tcp_server.communication)
-    # thread_udp: threading = threading.Thread(target=udp_server.communication)
+    thread_tcp: threading = threading.Thread(target=tcp_server.communication)
+    thread_udp: threading = threading.Thread(target=udp_server.communication)
 
-    # thread_tcp.start()
-    # thread_udp.start()
+    thread_udp.start()
+    thread_tcp.start()
 
-    # thread_tcp.join()
-    # thread_udp.join()
+    thread_udp.join()
+    thread_tcp.join()
     
     
 main()

@@ -37,9 +37,10 @@ class TcpClient:
         print(f'[TCP]Connect to {self.server_host}:{self.server_port}')
         try:
             self.sock.connect((self.server_host, self.server_port))
+            self.client_host, self.client_port = self.sock.getsockname()
         
         except OSError as err:
-            print(f'error : {err}')
+            print(f'[TCP]error : {err}')
             sys.exit(1)
 
     # 長さチェック
@@ -68,7 +69,7 @@ class TcpClient:
             self.sock.sendto(tcrp, (self.server_host, self.server_port))
         
         except OSError as e:
-            print(f'error: {e}')
+            print(f'[TCP]error: {e}')
 
     # データ受信
     def receive(self) -> None:
@@ -135,6 +136,7 @@ class TcpClient:
             print(f'[TCP]Joined {protocol.get_roomname(data)}')
 
 
+
 class UdpClient:
     def __init__(self, client_host: str, client_port: int, roomname: str, username: str, token: str) -> None:
         self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -162,7 +164,10 @@ class UdpClient:
             message: str = input()
             if self._check_timeout():
                 message = 'exit'
-                print('Time out!')
+                print('[UDP]Time out! Close connection.')
+                self.sock.close()
+                sys.exit(1)
+            
             header: bytes = protocol.create_udp_header(self.roomname, self.token)
             body: bytes = protocol.create_udp_body(self.roomname, self.token, message)
             data: bytes = header + body
@@ -171,7 +176,7 @@ class UdpClient:
 
             if message == 'exit':
                 self.sock.close()
-                break
+                sys.exit(1)
 
 
     # データ受信
@@ -198,7 +203,7 @@ class UdpClient:
         # ソケットとの紐づけ
         self.set_bind()
 
-        print("\nChat start!\nif you want to leave, enter 'exit'\n")
+        print("\n[UDP]Chat start!\nif you want to leave, enter 'exit'\n")
 
         # スレッドの作成、実行
         send_thread: threading.Thread = threading.Thread(target=self.send)
@@ -210,7 +215,7 @@ class UdpClient:
         send_thread.join()
         receive_thread.join()
 
-        print('close connection')
+        print('[UDP]close connection')
         self.sock.close()
 
 def main():
