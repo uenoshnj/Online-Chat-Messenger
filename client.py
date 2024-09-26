@@ -1,15 +1,5 @@
-'''
-# オンラインチャットプログラム（クライアント）
-    ・概要
-    サーバへ接続し、メッセージを送信する。
-
-    ・プロトコル
-    ヘッダー : ユーザ名の長さ（1バイト）
-    データ : メッセージ本文
-'''
 import socket
 import sys
-import os
 import threading
 import time
 

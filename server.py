@@ -1,16 +1,4 @@
-'''
-# オンラインチャットプログラム（サーバ）
-    ・概要
-    クライアントからのメッセージを待ち受ける
-
-    ・プロトコル
-    ヘッダー : ユーザ名の長さ（1バイト）+ メッセージの長さ（4バイト）
-    データ : メッセージ本文
-'''
-
-import os
 import socket
-import sys
 import threading
 import secrets
 import random
